@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Senseye — Mental Health You Can See</title>
+<meta name="description" content="Senseye is building the breakthrough diagnostic platform for mental health, starting with PTSD. Objective diagnosis through ocular biomarkers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,500&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="frame">
+
+  <!-- background video + grade -->
+  <video id="bgvid" autoplay muted loop playsinline preload="auto"
+         src="assets/eye-loop.mp4"></video>
+  <div class="grade"></div>
+
+  <!-- scan canvas + fx layers -->
+  <canvas id="scanCanvas"></canvas>
+  <div id="flash"></div>
+
+  <!-- nav -->
+  <header class="nav" id="chrome-top">
+    <a class="logo" href="#"><span class="logo-mark"></span>Senseye</a>
+    <nav class="links">
+      <a href="#">About Us</a>
+      <a href="#">Our Solution</a>
+      <a href="#">Press</a>
+      <a href="#">Contact Us</a>
+    </nav>
+    <a class="pill pill-accent" href="#">Book a Demo <span class="arr">&#8599;</span></a>
+  </header>
+
+  <!-- hero -->
+  <main class="hero" id="hero">
+    <span class="eyebrow"><i></i>OCULAR BIOMARKER DIAGNOSTICS</span>
+    <h1>
+      Objective Diagnosis.<br>
+      Minutes, Not Months.<br>
+      <em>Mental Health You Can See.</em>
+    </h1>
+    <p class="sub">
+      PTSD, anxiety, and depression leave measurable signals in the eyes.
+      Senseye combines computer vision and machine learning to turn a short
+      ocular test on an everyday smartphone into an objective read on the
+      brain &mdash; no lengthy interviews, no self-reports.
+    </p>
+    <a class="pill pill-light" href="#">Explore the Science <span class="arr arr-accent">&#8599;</span></a>
+  </main>
+
+  <!-- scan HUD (hidden until scan runs) -->
+  <div class="hud" id="hud" aria-hidden="true">
+    <div class="hud-phase">
+      <div class="phase" id="hudPhase">ACQUIRING TARGET</div>
+      <div class="phase-sub" id="hudSub">locking pupil centroid</div>
+    </div>
+    <div class="hud-metrics" id="hudMetrics">
+      <div class="m" data-t="1"><span class="k">Pupil diameter</span><span class="v" id="mPupil">4.82 <em>mm</em></span></div>
+      <div class="m" data-t="2"><span class="k">Dilation velocity</span><span class="v">1.36 <em>mm/s</em></span></div>
+      <div class="m flag" data-t="3"><span class="k">Light-reflex latency</span><span class="v">241 <em>ms &uarr;</em></span></div>
+      <div class="m" data-t="4"><span class="k">Saccade rate</span><span class="v">3.1 <em>/s</em></span></div>
+      <div class="m flag" data-t="5"><span class="k">Fixation stability</span><span class="v">0.71 <em>&sigma; &uarr;</em></span></div>
+      <div class="m good" data-t="6"><span class="k">Signal quality</span><span class="v">98.4 <em>%</em></span></div>
+    </div>
+    <div class="hud-progress">
+      <div class="pct" id="hudPct">0%</div>
+      <div class="bar"><i id="hudBar"></i></div>
+      <div class="cap">IRIS MAP &middot; 512 RADIAL SAMPLES</div>
+    </div>
+  </div>
+
+  <!-- crisp DOM labels driven by the WebGL engine -->
+  <div id="glLabels" aria-hidden="true">
+    <div class="gl-lock" id="glLock"></div>
+    <div class="gl-anom" id="glAnom0">&Delta; ANOM</div>
+    <div class="gl-anom" id="glAnom1">&Delta; ANOM</div>
+    <div class="gl-anom" id="glAnom2">&Delta; ANOM</div>
+    <div class="gl-complete" id="glComplete">
+      <div class="line">S C A N&nbsp;&nbsp;C O M P L E T E</div>
+      <div class="sub">BIOMARKER PROFILE READY FOR CLINICIAN REVIEW</div>
+    </div>
+  </div>
+
+  <!-- scan trigger, bottom right -->
+  <button class="pill pill-accent scan-btn" id="scanBtn">
+    Run Ocular Scan <span class="arr">&#8599;</span>
+  </button>
+
+</div>
+<script src="js/track-data.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
