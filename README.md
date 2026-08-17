@@ -15,7 +15,8 @@ js/scan3d.js        Three.js engine: video-as-texture, shader grade,
                     GPU digit cloud, UnrealBloom, camera dolly/parallax
 js/scan.js          Canvas2D fallback engine (auto-used if WebGL or the
                     CDN is unavailable)
-js/track-data.js    per-frame eye track (position, pupil + iris radius)
+js/track-data.js    per-frame eye track: center, radii, and 64-angle polar
+                    CONTOURS of the real pupil + iris edges
 assets/eye-loop.mp4 background footage (boomerang loop, seamless)
 ```
 
@@ -53,6 +54,13 @@ Then open http://localhost:8000 (opening index.html directly also works).
 
 ## Notes
 
+- The scan **traces the real anatomical edges**: at lock-on the actual pupil
+  contour draws itself on (starting from the top), followed by the actual iris
+  (limbus) contour. Both are 64-point polar profiles extracted per frame from
+  the footage (pupil from the dark-blob contour; iris from radial limbus
+  gradients, with eyelid-occluded angles filled by an ellipse fit), so they are
+  genuinely non-circular and deform, dilate, and move with the eye throughout
+  the scan.
 - The scan overlay tracks the eye **live during playback**: `js/track-data.js`
   holds per-frame pupil/iris measurements from the source footage, and the
   overlay samples them against `video.currentTime` every animation frame

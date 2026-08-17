@@ -63,6 +63,54 @@ function eyeState(){
            pupilMM: (sm.pr/sm.r)*11.7 };          // real dilation, in mm
 }
 
+/* real anatomical contours: 64-angle polar profiles per frame */
+const smProf = {p:null, i:null};
+function sampleProfiles(E){
+  const T = window.EYE_TRACK;
+  const A = (T && T.A) || 64;
+  const s = Math.max(W/VID_W, H/VID_H);
+  const p = new Float32Array(A), q = new Float32Array(A);
+  if (T && T.pupil && video.readyState>=2 && !isNaN(video.currentTime)){
+    const n=T.n, total=2*n-1;
+    let g=video.currentTime*T.fps; g=((g%total)+total)%total;
+    let f=g<=n-1 ? g : 2*n-2-g;
+    f=Math.max(0,Math.min(n-1.001,f));
+    const i=Math.floor(f), k=f-i, j=Math.min(i+1,n-1);
+    for(let a=0;a<A;a++){
+      p[a]=(T.pupil[i*A+a]*(1-k)+T.pupil[j*A+a]*k)*s;
+      q[a]=(T.iris [i*A+a]*(1-k)+T.iris [j*A+a]*k)*s;
+    }
+  }else{
+    for(let a=0;a<A;a++){ p[a]=E.pr; q[a]=E.r; }
+  }
+  if(!smProf.p){ smProf.p=p.slice(); smProf.i=q.slice(); }
+  else for(let a=0;a<A;a++){
+    smProf.p[a]+=(p[a]-smProf.p[a])*0.35;
+    smProf.i[a]+=(q[a]-smProf.i[a])*0.35;
+  }
+  return {p:smProf.p, i:smProf.i, A};
+}
+const CSTART=48;   /* trace starts at the top of the eye */
+function drawContour(prof, A, E, reveal, fade, rgb, width){
+  if(reveal<=0) return;
+  const nSeg=Math.floor(Math.min(reveal,1)*A);
+  if(nSeg<1) return;
+  ctx.save();
+  glow(`rgba(${rgb},0.95)`, 14);
+  ctx.strokeStyle=`rgba(${rgb},${0.95*fade})`;
+  ctx.lineWidth=width;
+  ctx.lineJoin="round";ctx.lineCap="round";
+  ctx.beginPath();
+  for(let s2=0;s2<=nSeg;s2++){
+    const a=(CSTART+s2)%A, th=a/A*Math.PI*2;
+    const px=E.cx+Math.cos(th)*prof[a], py=E.cy+Math.sin(th)*prof[a];
+    s2?ctx.lineTo(px,py):ctx.moveTo(px,py);
+  }
+  if(reveal>=1)ctx.closePath();
+  ctx.stroke();
+  noGlow();ctx.restore();
+}
+
 /* ------------ binary orbit digits ------------ */
 let bits = [];
 function buildBits(r){
@@ -176,6 +224,14 @@ function loop(ts){
     ctx.setLineDash([4,9]);ctx.lineDashOffset=-t*14;
     ctx.beginPath();ctx.arc(cx,cy,r*1.15,0,7);ctx.stroke();
     ctx.setLineDash([]);noGlow();
+  }
+
+  /* --- trace + track the REAL pupil edge, then the REAL iris edge --- */
+  if(t>=T_ACQ1){
+    const P=sampleProfiles({cx,cy,r,pr});
+    const cfade=t<T_ANL1?1:Math.max(1-(t-T_ANL1)*0.25, 0.55);
+    drawContour(P.p, P.A, {cx,cy}, (t-T_ACQ1)/0.55,      cfade, HOT, 2.6);
+    drawContour(P.i, P.A, {cx,cy}, (t-T_ACQ1-0.45)/0.65, cfade, CY,  3.2);
   }
 
   /* --- sweep --- */
@@ -306,6 +362,7 @@ function start(){
   if(running){ stop(true); return; }
   running=true; t0=null; curPhase=-1;
   sm.cx=sm.cy=sm.r=sm.pr=null;
+  smProf.p=smProf.i=null;
   buildBits(eyeState().r);
   metricEls.forEach(el=>el.classList.remove("on"));
   frame.classList.add("scanning");

@@ -59,6 +59,34 @@ function eyeState(){
 }
 const toWorld=(x,y,z=0)=>new THREE.Vector3(x, H-y, z);   // css px -> world
 
+/* ------ real anatomical contours: 64-angle polar profiles per frame ------ */
+const smProf = {p:null, i:null};
+function sampleProfiles(E){
+  const T = window.EYE_TRACK;
+  const A = (T && T.A) || 64;
+  const s = Math.max(W/VID_W, H/VID_H);
+  const p = new Float32Array(A), q = new Float32Array(A);
+  if (T && T.pupil && video.readyState>=2 && !isNaN(video.currentTime)){
+    const n=T.n, total=2*n-1;
+    let g=video.currentTime*T.fps; g=((g%total)+total)%total;
+    let f=g<=n-1 ? g : 2*n-2-g;
+    f=Math.max(0,Math.min(n-1.001,f));
+    const i=Math.floor(f), k=f-i, j=Math.min(i+1,n-1);
+    for(let a=0;a<A;a++){
+      p[a]=(T.pupil[i*A+a]*(1-k)+T.pupil[j*A+a]*k)*s;
+      q[a]=(T.iris [i*A+a]*(1-k)+T.iris [j*A+a]*k)*s;
+    }
+  }else{
+    for(let a=0;a<A;a++){ p[a]=E.pr; q[a]=E.r; }
+  }
+  if(!smProf.p){ smProf.p=p.slice(); smProf.i=q.slice(); }
+  else for(let a=0;a<A;a++){
+    smProf.p[a]+= (p[a]-smProf.p[a])*0.35;
+    smProf.i[a]+= (q[a]-smProf.i[a])*0.35;
+  }
+  return {p:smProf.p, i:smProf.i, A};
+}
+
 /* ---------------- renderer / scene / camera ---------------------------- */
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:false});
 renderer.setClearColor(0x131b45, 1);
@@ -215,6 +243,43 @@ eyeGroup.add(pulseA,pulseB,doneRing,shockRing);
 const pingRing=mkRing(MINT);
 eyeGroup.add(pingRing);
 
+/* anatomical outlines: dynamic strips tracing the REAL pupil + iris edges */
+function contourMesh(color, widthPx, opacity){
+  const SEGS=64, verts=SEGS*6;
+  const g=new THREE.BufferGeometry();
+  const pos=new THREE.Float32BufferAttribute(new Float32Array(verts*3),3);
+  pos.setUsage(THREE.DynamicDrawUsage);
+  g.setAttribute("position",pos);
+  const mesh=new THREE.Mesh(g, addMat(color, opacity));
+  mesh.userData={w:widthPx, base:opacity};
+  mesh.visible=false;
+  scene.add(mesh);
+  return mesh;
+}
+const pupilC = contourMesh(MINTHI, 2.6, 0.95);
+const irisC  = contourMesh(MINT,   3.2, 0.85);
+const START = 48;   /* trace starts at the top of the eye */
+function updateContour(mesh, prof, A, E, reveal, fade){
+  const arr=mesh.geometry.attributes.position.array;
+  const w=mesh.userData.w/2;
+  let o=0;
+  for(let s2=0;s2<A;s2++){
+    const a0=(START+s2)%A, a1=(START+s2+1)%A;
+    const t0=a0/A*Math.PI*2, t1=a1/A*Math.PI*2;
+    const c0=Math.cos(t0), s0=Math.sin(t0), c1=Math.cos(t1), s1=Math.sin(t1);
+    const r0=prof[a0], r1=prof[a1];
+    const p=(cx,cy)=>{arr[o++]=cx; arr[o++]=H-cy; arr[o++]=0;};
+    const i0x=E.cx+c0*(r0-w), i0y=E.cy+s0*(r0-w), o0x=E.cx+c0*(r0+w), o0y=E.cy+s0*(r0+w);
+    const i1x=E.cx+c1*(r1-w), i1y=E.cy+s1*(r1-w), o1x=E.cx+c1*(r1+w), o1y=E.cy+s1*(r1+w);
+    p(i0x,i0y); p(o0x,o0y); p(o1x,o1y);
+    p(i0x,i0y); p(o1x,o1y); p(i1x,i1y);
+  }
+  mesh.geometry.attributes.position.needsUpdate=true;
+  mesh.geometry.setDrawRange(0, Math.floor(Math.min(reveal,1)*A)*6);
+  mesh.material.opacity=mesh.userData.base*fade;
+  mesh.visible=reveal>0;
+}
+
 /* amber anomaly flags: squares + dashed leaders (positions set per frame) */
 const FLAGS=[[0.9,0.55],[2.5,0.78],[4.7,0.66]];
 const flagGroup=new THREE.Group(); scene.add(flagGroup);
@@ -338,8 +403,8 @@ function setPhase(t){
   if(i>0)flash(i===3);
 }
 const hideAll=()=>{
-  [dashRing,retGroup,ticksMesh,sweepGroup,pulseA,pulseB,doneRing,shockRing,pingRing]
-    .forEach(o=>o.visible=false);
+  [dashRing,retGroup,ticksMesh,sweepGroup,pulseA,pulseB,doneRing,shockRing,pingRing,
+   pupilC,irisC].forEach(o=>o.visible=false);
   digits.visible=false;
   flagMeshes.forEach(f=>{f.children.forEach(m=>m.material.opacity=0);
     f.userData.lead.material.opacity=0;});
@@ -427,6 +492,16 @@ function update(ts){
   if(t>=T_ACQ1){
     dashRing.visible=true;
     dashRing.rotation.z=-t*0.7;
+  }
+
+  /* trace + track the REAL pupil edge, then the REAL iris edge */
+  if(t>=T_ACQ1){
+    const P=sampleProfiles(E);
+    const fade=t<T_ANL1?1:Math.max(1-(t-T_ANL1)*0.25, 0.55);
+    const revP=(t-T_ACQ1)/0.55;                  /* pupil traces on first  */
+    const revI=(t-T_ACQ1-0.45)/0.65;             /* iris follows          */
+    updateContour(pupilC, P.p, P.A, E, revP, fade);
+    updateContour(irisC,  P.i, P.A, E, revI, fade);
   }
 
   /* sweep */
@@ -525,6 +600,7 @@ function start(){
   if(running){stop();return;}
   running=true;t0=null;curPhase=-1;
   sm.cx=sm.cy=sm.r=sm.pr=null;
+  smProf.p=smProf.i=null;
   hideAll();
   frameEl.classList.add("scanning");
   hud.classList.add("on");hud.setAttribute("aria-hidden","false");
