@@ -256,8 +256,39 @@ function contourMesh(color, widthPx, opacity){
   scene.add(mesh);
   return mesh;
 }
-const pupilC = contourMesh(MINTHI, 2.6, 0.95);
-const irisC  = contourMesh(MINT,   3.2, 0.85);
+const pupilC = contourMesh(MINTHI, 2.2, 0.95);   /* bright rim on the dot */
+const irisC  = contourMesh(MINT,   5.6, 0.92);   /* thick iris ellipse */
+
+/* solid pupil dot: dynamic fan filled with brand mint (normal blending
+   so it reads as a solid marker, like the reference mockup) */
+const pupilFill = (()=>{
+  const SEGS=64;
+  const g=new THREE.BufferGeometry();
+  const pos=new THREE.Float32BufferAttribute(new Float32Array(SEGS*3*3),3);
+  pos.setUsage(THREE.DynamicDrawUsage);
+  g.setAttribute("position",pos);
+  const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({
+    color:MINT, transparent:true, opacity:0.88,
+    depthWrite:false, depthTest:false, side:THREE.DoubleSide}));
+  m.visible=false; scene.add(m); return m;
+})();
+function updateFill(mesh, prof, A, E, grow, fade){
+  if(grow<=0){mesh.visible=false;return;}
+  const arr=mesh.geometry.attributes.position.array;
+  let o=0;
+  const p=(cx,cy)=>{arr[o++]=cx;arr[o++]=H-cy;arr[o++]=0;};
+  for(let s2=0;s2<A;s2++){
+    const a0=s2, a1=(s2+1)%A;
+    const t0=a0/A*Math.PI*2, t1=a1/A*Math.PI*2;
+    p(E.cx,E.cy);
+    p(E.cx+Math.cos(t0)*prof[a0]*grow, E.cy+Math.sin(t0)*prof[a0]*grow);
+    p(E.cx+Math.cos(t1)*prof[a1]*grow, E.cy+Math.sin(t1)*prof[a1]*grow);
+  }
+  mesh.geometry.attributes.position.needsUpdate=true;
+  mesh.geometry.setDrawRange(0,A*3);
+  mesh.material.opacity=0.88*fade;
+  mesh.visible=true;
+}
 const START = 48;   /* trace starts at the top of the eye */
 function updateContour(mesh, prof, A, E, reveal, fade){
   const arr=mesh.geometry.attributes.position.array;
@@ -404,7 +435,7 @@ function setPhase(t){
 }
 const hideAll=()=>{
   [dashRing,retGroup,ticksMesh,sweepGroup,pulseA,pulseB,doneRing,shockRing,pingRing,
-   pupilC,irisC].forEach(o=>o.visible=false);
+   pupilC,irisC,pupilFill].forEach(o=>o.visible=false);
   digits.visible=false;
   flagMeshes.forEach(f=>{f.children.forEach(m=>m.material.opacity=0);
     f.userData.lead.material.opacity=0;});
@@ -498,9 +529,10 @@ function update(ts){
   if(t>=T_ACQ1){
     const P=sampleProfiles(E);
     const fade=t<T_ANL1?1:Math.max(1-(t-T_ANL1)*0.25, 0.55);
-    const revP=(t-T_ACQ1)/0.55;                  /* pupil traces on first  */
-    const revI=(t-T_ACQ1-0.45)/0.65;             /* iris follows          */
-    updateContour(pupilC, P.p, P.A, E, revP, fade);
+    const grow=easeOut(Math.min(Math.max((t-T_ACQ1)/0.35,0),1)); /* dot pops in */
+    const revI=(t-T_ACQ1-0.3)/0.75;                              /* ellipse follows */
+    updateFill(pupilFill, P.p, P.A, E, grow, fade);
+    updateContour(pupilC, P.p, P.A, E, grow, fade);              /* bright rim */
     updateContour(irisC,  P.i, P.A, E, revI, fade);
   }
 

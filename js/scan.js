@@ -230,8 +230,23 @@ function loop(ts){
   if(t>=T_ACQ1){
     const P=sampleProfiles({cx,cy,r,pr});
     const cfade=t<T_ANL1?1:Math.max(1-(t-T_ANL1)*0.25, 0.55);
-    drawContour(P.p, P.A, {cx,cy}, (t-T_ACQ1)/0.55,      cfade, HOT, 2.6);
-    drawContour(P.i, P.A, {cx,cy}, (t-T_ACQ1-0.45)/0.65, cfade, CY,  3.2);
+    /* solid pupil dot pops in, then the thick iris ellipse traces on */
+    const grow=easeOut(Math.min(Math.max((t-T_ACQ1)/0.35,0),1));
+    if(grow>0){
+      ctx.save();
+      glow(`rgba(${CY},0.8)`,16*grow);
+      ctx.fillStyle=`rgba(${CY},${0.85*cfade})`;
+      ctx.beginPath();
+      for(let a=0;a<P.A;a++){
+        const th=a/P.A*Math.PI*2;
+        const px=cx+Math.cos(th)*P.p[a]*grow, py=cy+Math.sin(th)*P.p[a]*grow;
+        a?ctx.lineTo(px,py):ctx.moveTo(px,py);
+      }
+      ctx.closePath();ctx.fill();
+      noGlow();ctx.restore();
+    }
+    drawContour(P.p, P.A, {cx,cy}, grow,                 cfade, HOT, 2.2);
+    drawContour(P.i, P.A, {cx,cy}, (t-T_ACQ1-0.3)/0.75,  cfade, CY,  5.6);
   }
 
   /* --- sweep --- */

@@ -54,13 +54,13 @@ Then open http://localhost:8000 (opening index.html directly also works).
 
 ## Notes
 
-- The scan **traces the real anatomical edges**: at lock-on the actual pupil
-  contour draws itself on (starting from the top), followed by the actual iris
-  (limbus) contour. Both are 64-point polar profiles extracted per frame from
-  the footage (pupil from the dark-blob contour; iris from radial limbus
-  gradients, with eyelid-occluded angles filled by an ellipse fit), so they are
-  genuinely non-circular and deform, dilate, and move with the eye throughout
-  the scan.
+- The scan **marks the real anatomy**: at lock-on a solid mint dot fills the
+  actual pupil (popping in from the center, with a bright rim), then a thick
+  smooth ellipse traces the full iris outline. The pupil shape comes from the
+  per-frame dark-blob contour (heavily smoothed); the iris is a per-frame
+  ellipse fit to the limbus, extending naturally under the eyelids. Both are
+  64-point polar profiles that dilate, deform, and travel with the eye
+  throughout the scan.
 - The scan overlay tracks the eye **live during playback**: `js/track-data.js`
   holds per-frame pupil/iris measurements from the source footage, and the
   overlay samples them against `video.currentTime` every animation frame
